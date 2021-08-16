@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
-	"github.com/techcraftt/beemsms/internal"
+	"github.com/techcraftlabs/beemsms/internal"
 	"io"
 	"net/http"
 	"strings"

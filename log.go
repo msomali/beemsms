@@ -2,7 +2,7 @@ package beemsms
 
 import (
 	"fmt"
-	"github.com/techcraftt/beemsms/internal"
+	"github.com/techcraftlabs/beemsms/internal"
 	"net/http"
 	"net/http/httputil"
 	"strings"

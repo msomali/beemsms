@@ -1,3 +1,3 @@
-module github.com/techcraftt/beemsms
+module github.com/techcraftlabs/beemsms
 
 go 1.16

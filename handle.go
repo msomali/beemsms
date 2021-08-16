@@ -3,7 +3,7 @@ package beemsms
 import (
 	"bytes"
 	"context"
-	"github.com/techcraftt/beemsms/internal"
+	"github.com/techcraftlabs/beemsms/internal"
 	"io/ioutil"
 	"net/http"
 )

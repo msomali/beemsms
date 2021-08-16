@@ -2,7 +2,7 @@ package beemsms
 
 import (
 	"context"
-	"github.com/techcraftt/beemsms/internal"
+	"github.com/techcraftlabs/beemsms/internal"
 	"io"
 	"net/http"
 	"os"
