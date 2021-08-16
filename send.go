@@ -10,18 +10,18 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 )
 
 func (c *Client) send(ctx context.Context, rn internal.RequestName, request *internal.Request, v interface{}) error {
 
-	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
-	var req *http.Request
+	var (
+		req *http.Request
+	)
 	var res *http.Response
 
-	var reqBodyBytes []byte
-	var resBodyBytes []byte
+	var reqBodyBytes, resBodyBytes []byte
 	defer func(debug bool) {
 		if debug {
 			req.Body = io.NopCloser(bytes.NewBuffer(reqBodyBytes))
@@ -51,6 +51,10 @@ func (c *Client) send(ctx context.Context, rn internal.RequestName, request *int
 
 	if err != nil {
 		return err
+	}
+
+	if res.Body != nil {
+		resBodyBytes, _ = io.ReadAll(res.Body)
 	}
 
 	contentType := res.Header.Get("Content-Type")
