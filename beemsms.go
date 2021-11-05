@@ -2,10 +2,10 @@ package beemsms
 
 import (
 	"context"
-	"github.com/techcraftlabs/beemsms/internal"
+	"github.com/techcraftlabs/base"
+	libio "github.com/techcraftlabs/base/io"
 	"io"
 	"net/http"
-	"os"
 	"time"
 )
 
@@ -13,14 +13,13 @@ const (
 	defaultTimeout     = 60 * time.Second
 	ContentTypeTextXML = "text/xml"
 	ContentTypeXml     = "application/xml"
-	ContentTypeJson    = "application/json"
+	ContentTypeJson    = "application/json; charset=utf-8"
 )
 
 var (
 	_             CallbackHandler = (*CallbackFunc)(nil)
-	_             Service         = (*Client)(nil)
-	defaultWriter io.Writer       = os.Stderr
-	defaultClient                 = http.DefaultClient
+	_             service         = (*Client)(nil)
+	defaultWriter io.Writer       = libio.Stderr
 )
 
 type (
@@ -99,29 +98,35 @@ type (
 	Client struct {
 		*Config
 		logger   io.Writer
-		http     *http.Client
+		base     *base.Client
 		Callback CallbackHandler
+		rv base.Receiver
+		rp base.Replier
 		debug    bool
 	}
 
-	Service interface {
+	service interface {
 		Balance(ctx context.Context) (response BalanceResponse, err error)
 		Text(ctx context.Context, req SendRequest) (response SendResponse, err error)
-		CallbackHandler(ctx context.Context) http.HandlerFunc
+		CallbackHandler(writer http.ResponseWriter, r *http.Request)
 	}
 )
 
 func (c *Client) Balance(ctx context.Context) (response BalanceResponse, err error) {
-	var opts []internal.RequestOption
-	authOpt := internal.WithBasicAuth(c.Config.APIKey, c.Config.SecretKey)
+	response = BalanceResponse{}
 	cTypeHeader := map[string]string{
-		"Content-Type": ContentTypeJson + "; charset=utf-8",
+		"Content-Type": ContentTypeJson,
 	}
-	cTypeOpt := internal.WithMoreHeaders(cTypeHeader)
-	opts = append(opts, authOpt, cTypeOpt)
-	request := internal.NewRequest(ctx, http.MethodGet, c.Config.CheckBalanceURL, internal.JsonPayload, nil, opts...)
 
-	err = c.send(ctx, internal.CheckBalance, request, &response)
+	basicAuth := &base.BasicAuth{
+		Username: c.Config.APIKey,
+		Password: c.Config.SecretKey,
+	}
+	request := base.NewRequestBuilder("balance",http.MethodGet,c.Config.CheckBalanceURL).
+		Headers(cTypeHeader).
+		BasicAuth(basicAuth).
+		Build()
+	_, err = c.base.Do(ctx,request,&response)
 	if err != nil {
 		return response, err
 	}
@@ -129,34 +134,39 @@ func (c *Client) Balance(ctx context.Context) (response BalanceResponse, err err
 }
 
 func (c *Client) Text(ctx context.Context, req SendRequest) (response SendResponse, err error) {
-	var opts []internal.RequestOption
-	authOpt := internal.WithBasicAuth(c.Config.APIKey, c.Config.SecretKey)
+	response = SendResponse{}
 	cTypeHeader := map[string]string{
 		"Content-Type": ContentTypeJson,
 	}
-	cTypeOpt := internal.WithMoreHeaders(cTypeHeader)
-	opts = append(opts, authOpt, cTypeOpt)
-	request := internal.NewRequest(ctx, http.MethodPost, c.Config.SendSMSURL, internal.JsonPayload, req, opts...)
-	err = c.send(ctx, internal.SendSMS, request, &response)
+	basicAuth := &base.BasicAuth{
+		Username: c.Config.APIKey,
+		Password: c.Config.SecretKey,
+	}
+	request := base.NewRequestBuilder("send text",http.MethodPost,c.Config.CheckBalanceURL).
+		Headers(cTypeHeader).
+		Payload(req).
+		BasicAuth(basicAuth).
+		Build()
+	_, err = c.base.Do(ctx,request, &response)
 	if err != nil {
 		return response, err
 	}
 	return response, nil
 }
 
-func (c *Client) CallbackHandler(ctx context.Context) http.HandlerFunc {
-	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
-	defer cancel()
-
-	return c.handle(ctx, internal.JsonPayload, internal.CallbackRequest)
-
+func (c *Client) CallbackHandler(writer http.ResponseWriter, request *http.Request){
+	if c.Callback == nil {
+		res := base.NewResponse(200,nil)
+		c.rp.Reply(writer,res)
+		return
+    }
+	c.handleCallback(writer,request)
 }
 
 func NewClient(config *Config, handler CallbackHandler, opts ...ClientOpt) *Client {
 	c := &Client{
 		Config:   config,
 		logger:   defaultWriter,
-		http:     defaultClient,
 		Callback: handler,
 		debug:    true,
 	}
@@ -165,6 +175,9 @@ func NewClient(config *Config, handler CallbackHandler, opts ...ClientOpt) *Clie
 		opt(c)
 	}
 
+	c.base = base.NewClient(base.WithDebugMode(c.debug),base.WithLogger(c.logger))
+	c.rv = base.NewReceiver(c.logger,c.debug)
+	c.rp = base.NewReplier(c.logger,c.debug)
 	return c
 }
 

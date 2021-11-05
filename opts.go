@@ -2,16 +2,9 @@ package beemsms
 
 import (
 	"io"
-	"net/http"
 )
 
 type ClientOpt func(client *Client)
-
-func WithHTTPClient(client *http.Client) ClientOpt {
-	return func(c *Client) {
-		c.http = client
-	}
-}
 
 func WithWriter(writer io.Writer) ClientOpt {
 	return func(client *Client) {
